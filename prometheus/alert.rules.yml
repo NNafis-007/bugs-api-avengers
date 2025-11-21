@@ -1,0 +1,29 @@
+groups:
+  - name: container-alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"login_.*"}[2m]) * 100 > 70
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} using high CPU"
+          description: "CPU usage is above 70% for more than 1 minute."
+
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "The backend /metrics endpoint is not responding."
+
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"login_.*"} / container_spec_memory_limit_bytes{name=~"login_.*"}) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} using high memory"
+          description: "Memory usage is above 80% for more than 2 minutes."

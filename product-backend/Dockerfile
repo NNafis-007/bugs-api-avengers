@@ -7,8 +7,7 @@ RUN npm install || true
 
 # copy source
 COPY src ./src
-COPY .env.example ./
 
 ENV NODE_ENV=production
-EXPOSE 4000
+EXPOSE 5000
 CMD ["node", "src/index.js"]
