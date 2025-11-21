@@ -160,6 +160,7 @@ export default function App() {
   }
   const [selectedCampaign, setSelectedCampaign] = useState(null)
   const [donationAmount, setDonationAmount] = useState('')
+  const [currentIdempotencyKey, setCurrentIdempotencyKey] = useState(null)
 
   async function register() {
     try {
@@ -265,11 +266,83 @@ export default function App() {
   function backToCampaigns() {
     setSelectedCampaign(null)
     setDonationAmount('')
+    setCurrentIdempotencyKey(null)
   }
 
-  function handleDonate() {
-    // Functionality to be implemented later
-    setMessage(`Donation of $${donationAmount} will be processed (feature coming soon)`)
+  // Generate a unique idempotency key for each donation attempt
+  function generateIdempotencyKey() {
+    // Format: user-{userId}-campaign-{campaignId}-{timestamp}-{random}
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 15)
+    return `${user.id}-${selectedCampaign.id}-${timestamp}-${random}`
+  }
+
+  async function handleDonate(isRetry = false) {
+    if (!selectedCampaign || !donationAmount || parseFloat(donationAmount) <= 0) {
+      setMessage('Please enter a valid donation amount')
+      return
+    }
+
+    try {
+      setMessage('Processing donation...')
+      
+      // Generate new key for fresh attempts, reuse existing key for retries
+      let idempotencyKey
+      if (isRetry && currentIdempotencyKey) {
+        idempotencyKey = currentIdempotencyKey
+        console.log('🔄 Retrying with existing idempotency key:', idempotencyKey.substring(0, 30) + '...')
+      } else {
+        idempotencyKey = generateIdempotencyKey()
+        setCurrentIdempotencyKey(idempotencyKey)
+        console.log('🔑 New donation attempt with idempotency key:', idempotencyKey.substring(0, 30) + '...')
+      }
+      
+      const res = await fetch(`${apiBase}/api/donate`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Idempotency-Key': idempotencyKey
+        },
+        body: JSON.stringify({ 
+          campaignId: selectedCampaign.id,
+          amount: parseFloat(donationAmount)
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        if (data.replayed) {
+          setMessage(`ℹ️ This donation was already processed. Donation ID: ${data.donation.donationId}`)
+        } else {
+          setMessage(`✅ Thank you! Your donation of $${donationAmount} has been received. Donation ID: ${data.donation.donationId}`)
+        }
+        
+        // Clear the form and reset idempotency key for next donation
+        setDonationAmount('')
+        setCurrentIdempotencyKey(null)
+        console.log('✅ Donation successful - idempotency key cleared for next donation')
+        
+        // Optionally refresh campaign to show updated amount
+        await viewCampaignDetails(selectedCampaign.id)
+      } else if (res.status === 401) {
+        // Token expired, try to refresh
+        setMessage('Session expired, refreshing...')
+        await refreshAccessToken(refreshToken)
+        // Retry donation after token refresh with SAME idempotency key
+        await handleDonate(true)
+      } else {
+        setMessage(`❌ Donation failed: ${data.message || data.error}`)
+        // Clear idempotency key on failure so user can retry with fresh key
+        setCurrentIdempotencyKey(null)
+      }
+    } catch (error) {
+      setMessage(`❌ Error processing donation: ${error.message}`)
+      console.error('Donation error:', error)
+      // Clear idempotency key on error so user can retry with fresh key
+      setCurrentIdempotencyKey(null)
+    }
   }
 
   // Show loading state while checking authentication

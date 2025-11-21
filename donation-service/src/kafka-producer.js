@@ -1,7 +1,7 @@
 const { Kafka } = require('kafkajs');
 
 const kafka = new Kafka({
-  clientId: 'login-backend',
+  clientId: 'donation-service',
   brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
   retry: {
     initialRetryTime: 100,
@@ -22,19 +22,19 @@ async function ensureTopicExists() {
     await admin.connect();
     const existingTopics = await admin.listTopics();
     
-    if (!existingTopics.includes('Login')) {
-      console.log('📝 Creating Login topic...');
+    if (!existingTopics.includes('donation')) {
+      console.log('📝 Creating donation topic...');
       await admin.createTopics({
-        topics: [{ topic: 'Login', numPartitions: 3, replicationFactor: 1 }],
+        topics: [{ topic: 'donation', numPartitions: 3, replicationFactor: 1 }],
         waitForLeaders: true
       });
-      console.log('✅ Login topic created');
+      console.log('✅ Donation topic created');
     }
     
     await admin.disconnect();
     topicEnsured = true;
   } catch (error) {
-    console.error('❌ Error ensuring Login topic exists:', error.message);
+    console.error('❌ Error ensuring donation topic exists:', error.message);
     await admin.disconnect().catch(() => {});
     // Don't throw - let the producer retry
   }
@@ -49,31 +49,33 @@ async function connectProducer() {
   }
 }
 
-async function publishUserRegistration(userData) {
+async function publishDonation(donationData) {
   try {
     await connectProducer();
     
-    const message = {
-      id: userData.id,
-      username: userData.username,
-      email: userData.email,
-      timestamp: new Date().toISOString()
-    };
-
     await producer.send({
-      topic: 'Login',
+      topic: 'donation',
       messages: [
         {
-          key: userData.email,
-          value: JSON.stringify(message),
+          key: donationData.donationId,
+          value: JSON.stringify(donationData),
+          headers: {
+            'event-type': 'donation.created',
+            'source': 'donation-service'
+          }
         },
       ],
     });
 
-    console.log('User registration event published to Kafka:', message);
+    console.log('✅ Donation event published to Kafka:', {
+      donationId: donationData.donationId,
+      campaignId: donationData.campaignId,
+      amount: donationData.amount,
+      userEmail: donationData.userEmail
+    });
   } catch (error) {
-    console.error('Failed to publish to Kafka:', error);
-    // Don't throw error - registration should succeed even if Kafka fails
+    console.error('❌ Failed to publish donation to Kafka:', error);
+    throw error; // Re-throw to handle in the main service
   }
 }
 
@@ -86,4 +88,4 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-module.exports = { publishUserRegistration };
+module.exports = { publishDonation };

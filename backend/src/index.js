@@ -173,7 +173,11 @@ app.post('/api/register', async (req, res) => {
     const newUser = r.rows[0];
     
     // Publish user registration event to Kafka
-    await publishUserRegistration({ email });
+    await publishUserRegistration({ 
+      id: newUser.id, 
+      email: newUser.email,
+      username: newUser.email.split('@')[0]
+    });
     
     // Auto-login: Generate tokens for the new user
     const accessToken = jwt.sign(
