@@ -10,8 +10,8 @@ export default function App() {
   const [refreshToken, setRefreshToken] = useState(null)
   const [user, setUser] = useState(null)
   const [message, setMessage] = useState('')
-  const [products, setProducts] = useState([])
-  const [showProducts, setShowProducts] = useState(false)
+  const [campaigns, setCampaigns] = useState([])
+  const [showCampaigns, setShowCampaigns] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -158,6 +158,8 @@ export default function App() {
     setProducts([])
     setShowProducts(false)
   }
+  const [selectedCampaign, setSelectedCampaign] = useState(null)
+  const [donationAmount, setDonationAmount] = useState('')
 
   async function register() {
     try {
@@ -199,8 +201,8 @@ export default function App() {
         setMessage(`Logged in successfully! Welcome, ${data.user.email}`)
         setEmail('')
         setPassword('')
-        // Fetch products after successful login
-        await fetchProducts()
+        // Fetch campaigns after successful login
+        await fetchCampaigns()
       } else {
         setMessage(data.error || JSON.stringify(data))
       }
@@ -232,18 +234,42 @@ export default function App() {
     }
   }
 
-  async function fetchProducts() {
+  async function fetchCampaigns() {
     try {
-      const res = await fetch(`${apiBase}/api/products`)
+      const res = await fetch(`${apiBase}/api/campaigns`)
       const data = await res.json()
-      if (data.products) {
-        setProducts(data.products)
-        setShowProducts(true)
-        setMessage(`Loaded ${data.products.length} products`)
+      if (data.campaigns) {
+        setCampaigns(data.campaigns)
+        setShowCampaigns(true)
+        setMessage(`Loaded ${data.campaigns.length} campaigns`)
       }
     } catch (err) {
-      setMessage('Failed to fetch products: ' + err.message)
+      setMessage('Failed to fetch campaigns: ' + err.message)
     }
+  }
+
+  async function viewCampaignDetails(campaignId) {
+    try {
+      const res = await fetch(`${apiBase}/api/campaigns/${campaignId}`)
+      const data = await res.json()
+      if (data.campaign) {
+        setSelectedCampaign(data.campaign)
+        setDonationAmount('')
+        setMessage(`Viewing campaign: ${data.campaign.name}`)
+      }
+    } catch (err) {
+      setMessage('Failed to fetch campaign details: ' + err.message)
+    }
+  }
+
+  function backToCampaigns() {
+    setSelectedCampaign(null)
+    setDonationAmount('')
+  }
+
+  function handleDonate() {
+    // Functionality to be implemented later
+    setMessage(`Donation of $${donationAmount} will be processed (feature coming soon)`)
   }
 
   // Show loading state while checking authentication

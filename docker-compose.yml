@@ -27,6 +27,18 @@ services:
     networks:
       - app-net
 
+  redis:
+    container_name: campaign_redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-net
+
   db:
     container_name: login_db
     image: postgres:14
@@ -78,15 +90,18 @@ services:
     networks:
       - app-net
 
-  product-backend:
-    container_name: product_backend
+  campaign-service:
+    container_name: campaign_service
     build:
-      context: ./product-backend
+      context: ./campaign-service
     environment:
       - DATABASE_URL=postgresql://postgres:123@db:5432/login_db
+      - REDIS_URL=redis://redis:6379
       - PORT=5000
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
